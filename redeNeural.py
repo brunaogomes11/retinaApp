@@ -2,15 +2,12 @@ import torch
 from torch import nn, optim
 import torch.nn.functional as F
 from torchvision import datasets, transforms
-# import splitfolders
 
 torch.manual_seed(123)
 
-# splitfolders.ratio("xray_dataset", ratio=(0.8, 0.1, 0.1))
-
 #Base de dados
-data_dir_train = './archive/Training'
-data_dir_test = './archive/Testing'
+data_dir_train = './train'
+data_dir_test = './test'
 
 transform_train = transforms.Compose(
     [
@@ -30,8 +27,8 @@ transform_test = transforms.Compose(
 train_dataset = datasets.ImageFolder(data_dir_train, transform = transform_train)
 test_dataset = datasets.ImageFolder(data_dir_test, transform = transform_test)
 
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size = 128, shuffle=True)
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size = 128, shuffle=True)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size = 10, shuffle=True)
+test_loader = torch.utils.data.DataLoader(test_dataset, batch_size = 10, shuffle=True)
 # Contrução do Modelo
 class classificador(nn.Module):
   def __init__(self):
@@ -53,7 +50,10 @@ class classificador(nn.Module):
     # 33907200 valores -> 256 neurônios da camada oculta
     self.linear1 = nn.Linear(in_features=14*14*64, out_features=256)
     self.linear2 = nn.Linear(256, 128)
-    self.output = nn.Linear(128, 4)
+    self.linear3 = nn.Linear(128, 64)
+    self.linear4 = nn.Linear(64, 32)
+    self.linear5 = nn.Linear(32, 16)
+    self.output = nn.Linear(16, 3)
 
   def forward(self, X):
     X = self.pool(self.bnorm(self.activation(self.conv1(X))))
@@ -63,19 +63,22 @@ class classificador(nn.Module):
     # Camadas densas
     X = self.activation(self.linear1(X))
     X = self.activation(self.linear2(X))
+    X = self.activation(self.linear3(X))
+    X = self.activation(self.linear4(X))
+    X = self.activation(self.linear5(X))
     
     # Saída
     X = self.output(X)
+    X = F.softmax(X, dim=1)
 
     return X
 
 net = classificador()
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(net.parameters(), lr=0.03, momentum=0.0)
+optimizer = optim.SGD(net.parameters(), lr=0.08, momentum=0.0)
 
 device = torch.device('cpu')
 device
-
 net.to(device)
 
 def training_loop(loader, epoch):
@@ -107,7 +110,7 @@ def training_loop(loader, epoch):
     # Imprimindo os dados referentes a essa época
     print('\rÉPOCA {:3d} FINALIZADA: perda {:.5f} - precisão {:.5f}'.format(epoch + 1, running_loss/len(loader), running_accuracy/len(loader)))
 
-epochs = 20
+epochs = 100
 for epoch in range(epochs):
   # Treino
   print("Treinando")
@@ -120,4 +123,3 @@ for epoch in range(epochs):
 
 net.eval()
 torch.save(net.state_dict(), "checkpoint.pth")
-
